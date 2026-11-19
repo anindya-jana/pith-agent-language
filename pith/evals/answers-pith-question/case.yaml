@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: answers-pith-question
+expected_outcome: |
+  reply.txt answers all three questions in Pith. #1 is a `fact` giving node >=20.11 with
+  package.json as its source. #2 is answered with `no` or `need` (or a fact that the key is
+  missing) because config/default.json has no redis url, and no url is invented. #3 is a `fact`
+  naming vitest with package.json as its source. Nothing was installed and no tests were run.
+  The reply passes `python scripts/pith.py lint` with 0 errors.
+context:
+  scaffold_script: place-files.sh

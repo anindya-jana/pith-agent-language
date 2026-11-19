@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: writes-subagent-brief
+expected_outcome: |
+  brief.txt holds a Pith brief: a header line `pith 1`, a `do` statement, and one-space-indented
+  slots carrying the purpose, the src/billing/ prohibition, the no-timeout-bump preference, the
+  wanted output, the 20-run jest check and the 30-call cap. The mock-clock race is marked as a
+  `guess`, not a `fact`. The brief passes `python scripts/pith.py lint` with 0 errors.

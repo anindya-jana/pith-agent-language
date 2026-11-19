@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: reads-pith-report
+expected_outcome: |
+  A plain-language answer, not Pith. It says the only verified result is that `npm test auth`
+  passed 41 of 41; the root-cause explanation is the subagent's inference; the claim about
+  src/auth/refresh.ts is an untested guess; and the job is not fully finished because the full
+  test suite was not run and refresh.ts was not checked.
