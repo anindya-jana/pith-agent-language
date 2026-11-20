@@ -14,7 +14,9 @@ import json
 import os
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -94,7 +96,7 @@ def run_case(case, arm, hops, model, args):
         trace.append({"role": "user", "content": user, "agent": role})
         out = chat([{"role": "system", "content": system}, {"role": "user", "content": user}],
                    reader_model if role == "reader" else model,
-                   base_url=args.base_url, timeout=args.timeout,
+                   base_url=args.base_url, timeout=args.timeout, retries=args.retries,
                    reasoning_effort=args.reasoning_effort or None, **kw)
         trace.append({"role": "assistant", "content": out["content"], "thinking": out["reasoning"],
                       "agent": role, "usage": out["usage"], "finish_reason": out["finish_reason"]})
@@ -203,6 +205,10 @@ def main():
     p.add_argument("--seed", type=int, default=2026)
     p.add_argument("--base-url", default=DEFAULT_URL)
     p.add_argument("--api-key-file", help="file holding the API key for a hosted endpoint (kept out of the repo)")
+    p.add_argument("--retries", type=int, default=3,
+                   help="retries per call on 429/5xx/connection errors, with jittered backoff up to 60 s")
+    p.add_argument("--workers", type=int, default=1,
+                   help="parallel cases; useful for slow hosted APIs, keep 1 for a local GPU")
     p.add_argument("--min-interval", type=float, default=0.0,
                    help="seconds to wait between calls, for rate-limited free tiers")
     p.add_argument("--timeout", type=int, default=600, help="per-call wall-clock ceiling, seconds")
@@ -248,23 +254,35 @@ def main():
     print(f"{len(todo)} runs to do ({len(cases)} cases x {len(arms)} arms, hops={args.hops}); "
           f"{len(cases) * len(arms) - len(todo)} already done")
     t0 = time.monotonic()
-    for i, (case, arm) in enumerate(todo, 1):
+    write_lock = threading.Lock()
+    finished = [0]
+
+    def work(item):
+        case, arm = item
         try:
             row, trace = run_case(case, arm, args.hops, args.model, args)
         except LLMError as e:
-            append(errors, {"case": case["id"], "arm": arm, "hops": args.hops, "model": args.model,
-                            "kind": e.kind, "error": str(e)[:300], "attempts": e.attempts,
-                            "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
-            print(f"[{i}/{len(todo)}] {case['id']} {arm}: ERROR {e.kind}")
-            continue
-        with open(os.path.join(out_dir, "traces", f"{case['id']}_{arm}_h{args.hops}.json"), "w",
-                  encoding="utf-8", newline="\n") as f:
-            json.dump(trace, f, ensure_ascii=False, indent=1)
-        append(results, row)
-        rate = (time.monotonic() - t0) / i
-        print(f"[{i}/{len(todo)}] {case['id']} {arm:12} acc={row['grade']['acc']:.2f} "
-              f"msg={row['msg_tokens']} total={row['total_tokens']} {row['status']} "
-              f"eta {rate * (len(todo) - i) / 60:.0f} min", flush=True)
+            with write_lock:
+                finished[0] += 1
+                append(errors, {"case": case["id"], "arm": arm, "hops": args.hops, "model": args.model,
+                                "kind": e.kind, "error": str(e)[:300], "attempts": e.attempts,
+                                "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                print(f"[{finished[0]}/{len(todo)}] {case['id']} {arm}: ERROR {e.kind}", flush=True)
+            return
+        with write_lock:
+            finished[0] += 1
+            with open(os.path.join(out_dir, "traces", f"{case['id']}_{arm}_h{args.hops}.json"), "w",
+                      encoding="utf-8", newline="\n") as f:
+                json.dump(trace, f, ensure_ascii=False, indent=1)
+            append(results, row)
+            i = finished[0]
+            rate = (time.monotonic() - t0) / i
+            print(f"[{i}/{len(todo)}] {case['id']} {arm:12} acc={row['grade']['acc']:.2f} "
+                  f"msg={row['msg_tokens']} total={row['total_tokens']} {row['status']} "
+                  f"eta {rate * (len(todo) - i) / 60:.0f} min", flush=True)
+
+    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+        list(pool.map(work, todo))
     return 0
 
 

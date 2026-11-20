@@ -24,6 +24,7 @@ from suite_handoff import QUESTION_NAMES  # noqa: E402
 RESULTS = os.path.join(ROOT, "bench", "results", "handoff")
 ARMS = ["english", "terse", "json", "pith_skill", "pith_primer"]
 V11 = ["pith_skill_1.1", "pith_primer_1.1"]
+MIN_CASES = 10  # a model with fewer finished cases is too noisy to list
 
 
 def paired(by_arm, base, arm, key):
@@ -101,10 +102,10 @@ def main():
         path = os.path.join(RESULTS, name)
         if os.path.isfile(os.path.join(path, "results.jsonl")):
             s = summarise(path, args.hops)
-            if s:
+            if s and s["cases"] >= MIN_CASES:
                 models.append(s)
             h = summarise(path, args.hops, "heldout")
-            if h:
+            if h and h["cases"] >= MIN_CASES:
                 heldout.append(h)
     models.sort(key=lambda s: -s["oracle"])
     heldout.sort(key=lambda s: -s["oracle"])

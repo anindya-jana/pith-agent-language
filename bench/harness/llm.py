@@ -8,6 +8,7 @@ import json
 import os
 import random
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -15,7 +16,10 @@ import urllib.request
 DEFAULT_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:1234/v1")
 API_KEY = os.environ.get("LLM_API_KEY", "")  # only for hosted endpoints; never written to results
 MIN_INTERVAL = 0.0  # seconds between calls, for rate-limited free tiers
+OPTIONAL_FIELDS = ("seed", "reasoning_effort")
+UNSUPPORTED = set()  # optional fields this server has rejected
 _last_call = [0.0]
+_spacing = threading.Lock()
 
 
 def set_api_key_file(path):
@@ -63,13 +67,16 @@ def chat(messages, model, *, base_url=DEFAULT_URL, max_tokens=1500, seed=7,
             "type": "json_schema",
             "json_schema": {"name": "answer", "strict": True, "schema": json_schema},
         }
+    for field in UNSUPPORTED:
+        body.pop(field, None)
     data = json.dumps(body).encode("utf-8")
     last = None
     for attempt in range(1, retries + 2):
-        wait = MIN_INTERVAL - (time.monotonic() - _last_call[0])
-        if wait > 0:
-            time.sleep(wait)
-        _last_call[0] = time.monotonic()
+        with _spacing:  # one call starts at a time, MIN_INTERVAL apart, across threads
+            wait = MIN_INTERVAL - (time.monotonic() - _last_call[0])
+            if wait > 0:
+                time.sleep(wait)
+            _last_call[0] = time.monotonic()
         start = time.monotonic()
         try:
             req = urllib.request.Request(
@@ -78,8 +85,16 @@ def chat(messages, model, *, base_url=DEFAULT_URL, max_tokens=1500, seed=7,
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 payload = json.load(resp)
         except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", "replace")[:300]
+            detail = e.read().decode("utf-8", "replace")[:600]
             last = LLMError("http_%d" % e.code, detail, attempt)
+            dropped = [f for f in OPTIONAL_FIELDS if f in body and re.search(r'\\?"%s\\?"' % f, detail)]
+            if e.code == 400 and dropped:
+                # The server rejects an optional field (Gemini has no `seed`): drop it for
+                # every later call too, and retry at once.
+                UNSUPPORTED.update(dropped)
+                return chat(messages, model, base_url=base_url, max_tokens=max_tokens, seed=seed,
+                            json_schema=json_schema, timeout=timeout, retries=retries,
+                            reasoning_effort=reasoning_effort)
             if e.code not in (408, 409, 429) and e.code < 500:
                 raise last
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
@@ -87,7 +102,7 @@ def chat(messages, model, *, base_url=DEFAULT_URL, max_tokens=1500, seed=7,
         else:
             latency = time.monotonic() - start
             return _parse(payload, model, latency, attempt)
-        time.sleep(min(30, 2 ** attempt) * (0.5 + random.random()))
+        time.sleep(min(60, 2 ** attempt) * (0.5 + random.random()))
     raise last
 
 

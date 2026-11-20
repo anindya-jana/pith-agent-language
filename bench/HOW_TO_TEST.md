@@ -113,8 +113,20 @@ python -c "import getpass,pathlib; p=pathlib.Path.home()/'.pith'; p.mkdir(exist_
 ```
 
 Then pass `--api-key-file ~/.pith/api_key` and the provider's OpenAI-compatible base URL. For
-Gemini that is `https://generativelanguage.googleapis.com/v1beta/openai`. On a free tier, add
-`--min-interval 6` (seconds between calls) to stay under the rate limit.
+Gemini that is `https://generativelanguage.googleapis.com/v1beta/openai`. Hosted APIs are slow per
+call but take parallel requests, so add `--workers 4`. On a free tier, add `--min-interval 2`
+(seconds between call starts) and `--retries 6`, because busy models answer "high demand" (503)
+or "quota exceeded" (429) and need retrying.
+
+A Gemini example, as used for the published Gemini results:
+
+```bash
+python bench/harness/run.py --model gemini-3.5-flash --base-url https://generativelanguage.googleapis.com/v1beta/openai --api-key-file ~/.pith/gemini_key --reasoning-effort low --workers 4 --retries 6 --min-interval 1 --n 30
+```
+
+Gemini rejects the `seed` field; the runner notices and drops it automatically. Gemini models
+take `--reasoning-effort low` (not `none`); Gemma models served by Gemini take no reasoning setting,
+so pass `--reasoning-effort ""` for them.
 
 Check that the model is listed:
 
