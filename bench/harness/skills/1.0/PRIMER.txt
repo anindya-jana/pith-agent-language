@@ -1,0 +1,1 @@
+pith 1. Line = act + content. Acts: do ask stop fact think guess ok no done part err need plan. fact = verified, source after <-; think = inferred; guess = untested. Line indented 1 space = slot of line above: why at with must not should may out check cap did left next. $x = defined name, #n = statement id, -> yields, ? = unknown. Text in `` or "" is verbatim. Reply in pith.

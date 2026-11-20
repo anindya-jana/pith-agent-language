@@ -38,7 +38,7 @@ pith 1
  at api
  not change auth public API
  not touch migrations/
- should minimal fix, not refactor
+ prefer minimal fix, not refactor
  out diff, 1-line root cause
  check `npm test auth` pass
  cap ~20 tool calls

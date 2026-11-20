@@ -18,7 +18,7 @@ Negative percentages mean Pith used fewer tokens. The tokenizers are OpenAI's, u
 | four-turn investigation | 275 | 201 | 324 | 188 | -32% | -6% | -42% |
 | **total** | 1304 | 836 | 1204 | 793 | -39% | -5% | -34% |
 
-First-contact primer: 103 tokens, sent once per peer.
+First-contact primer: 144 tokens, sent once per peer.
 
 ### cl100k_base
 
@@ -34,5 +34,5 @@ First-contact primer: 103 tokens, sent once per peer.
 | four-turn investigation | 278 | 201 | 318 | 186 | -33% | -7% | -42% |
 | **total** | 1327 | 833 | 1174 | 789 | -41% | -5% | -33% |
 
-First-contact primer: 103 tokens, sent once per peer.
+First-contact primer: 144 tokens, sent once per peer.
 

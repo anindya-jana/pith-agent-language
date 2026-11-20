@@ -18,20 +18,21 @@ import sys
 
 ACTS = ("do", "ask", "stop", "fact", "think", "guess",
         "ok", "no", "done", "part", "err", "need", "plan")
-SLOTS = ("why", "at", "with", "must", "not", "should", "may", "out",
+SLOTS = ("why", "at", "with", "must", "not", "prefer", "allow", "out",
          "check", "cap", "did", "left", "next", "tab")
+OLD_SLOTS = {"should": "prefer", "may": "allow"}  # Pith 1.0 names, still accepted
 PRONOUNS = {"it", "its", "this", "that", "these", "those", "they", "them",
             "their", "he", "she", "him", "her", "his"}
 FILLER = {"the", "a", "an", "please", "just", "really", "very", "basically",
           "actually", "simply", "kindly"}
 
 PRIMER = (
-    "pith 1. Line = act + content. Acts: do ask stop fact think guess ok no "
-    "done part err need plan. fact = verified, source after <-; think = "
-    "inferred; guess = untested. Line indented 1 space = slot of line above: "
-    "why at with must not should may out check cap did left next. $x = "
-    "defined name, #n = statement id, -> yields, ? = unknown. Text in `` or "
-    "\"\" is verbatim. Reply in pith."
+    "pith 1. Each line starts with an act: do ask stop fact think guess ok no done part err "
+    "need plan. fact = verified by sender, source after <-. think, guess = sender's belief, "
+    "not verified. A line indented 1 space is a slot of the line above: why at with | must "
+    "(required) not (forbidden) prefer (optional) allow (permitted) | out check cap | did left "
+    "next. In reports: did not <x> = rule kept; left = not done. Commands in ``, errors in \"\" "
+    "are exact. $x = defined name, #n = statement id, -> yields, ? = unknown. Reply in pith."
 )
 
 STMT = re.compile(r"^(?:#(\w+) )?([a-z]+)(?: (.*))?$")
@@ -147,9 +148,13 @@ def lint(text, known=()):
             check_words(n, body.split(" ", 1)[1])
             continue
         word, _, rest = body.partition(" ")
-        if word not in SLOTS:
+        if word in OLD_SLOTS:
+            add(n, "W", "W07", f"slot {word!r} is the Pith 1.0 name; use {OLD_SLOTS[word]!r}")
+        elif word not in SLOTS:
             add(n, "E", "E03", f"unknown slot {word!r}")
             continue
+        if word == "check" and "`" not in rest:
+            add(n, "W", "W08", "check has no command in backticks: copy the command exactly")
         cur["slots"].add(word)
         if word == "tab":
             cur["cols"] = mask(rest).count("|") + 1

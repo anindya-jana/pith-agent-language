@@ -1,6 +1,8 @@
 ---
 name: pith
 description: Pith is a compact, structured language for messages between AI agents - subagent briefs, handoffs, status reports, findings, questions and plans. It uses about 40% fewer tokens than ordinary agent prose and a third fewer than JSON, and makes messages more reliable - every claim is marked verified, inferred or guessed, every task carries a done-check, and names replace pronouns. Use this skill whenever you write a message that another agent will read (briefing or spawning a subagent, SendMessage, a handoff note, a reply to an orchestrator, a worker report), whenever a message you receive starts with `pith 1` or is made of lines like `do`, `fact`, `done` with one-space-indented lines under them, and whenever the user mentions Pith, an agent language, agent shorthand, or cutting tokens in agent-to-agent messages. Do not use it for text a person will read.
+metadata:
+  version: "1.1"
 ---
 
 # Pith
@@ -14,13 +16,15 @@ pith 1
 #1 do fix login 500
  why users locked out since deploy 4f2a91c
  not touch migrations/
+ prefer minimal fix over refactor
  out diff, 1-line root cause
  check `npm test auth` pass
 guess bug at src/auth/session.ts:40-90
 ```
 
-That brief says what to do, why, what is off limits, what to return and how to know it is done.
-The sender's hunch is marked as a guess, so the receiver knows to test it, not trust it.
+That brief says what to do, why, what is off limits, what is only preferred, what to return and how
+to know it is done. The sender's hunch is marked as a guess, so the receiver knows to test it, not
+trust it.
 
 ## Why Pith helps
 
@@ -61,11 +65,13 @@ belongs to the statement above it. `$name = value` at column 0 defines a handle.
 
 | Brief slots | | Report slots | |
 |---|---|---|---|
-| `why` | purpose | `did` | what was changed or run |
+| `why` | purpose | `did` | what was changed or run, and rules kept |
 | `at` | where to work | `out` | the output asked for |
 | `with` | inputs, known facts, tools | `left` | what is undone or unverified |
-| `must` / `not` | hard requirement / prohibition | `next` | recommended next step |
-| `should` / `may` | preference / permission | `tab` | table header: `tab a \| b \| c` |
+| `must` | hard requirement | `next` | recommended next step |
+| `not` | hard prohibition: must not | `tab` | table header: `tab a \| b \| c` |
+| `prefer` | preference, not a rule | | |
+| `allow` | permission: this is allowed | | |
 | `out` | shape of the reply wanted | | |
 | `check` | test that proves the task is done | | |
 | `cap` | budget: time, calls, tokens | | |
@@ -77,25 +83,27 @@ belongs to the statement above it. `$name = value` at column 0 defines a handle.
 | `=` `!=` | is / is not | | `$name` | handle defined earlier |
 | `->` | yields, leads to, then | | `#n` | statement id |
 | `<-` | because, from, source | | `@name` | an agent or role |
-| `~` | about | | `` `x` `` | verbatim code, command, literal |
+| `~` | about | | `` `x` `` | verbatim code, command, path, literal |
 | `?` | unknown | | `"x"` | verbatim quote or error text |
 | `,` / `or` | and / alternatives | | `not` | negates the next word |
 
 ## Writing Pith
 
 1. **Pick the act.** What are you doing: requesting (`do`), asking (`ask`), claiming, reporting
-   (`done` `part` `err` `need`), answering (`ok` `no`), proposing (`plan`)?
+   (`done` `part` `err` `need`), answering (`ok` `no`), proposing (`plan`)? `need` means you are
+   blocked; a suggestion for later goes in a `next` slot, not in `need`.
 2. **Write the content as verb, object, detail.** Drop articles, "is", politeness and hedges.
-3. **Add slots.** For a `do`, always think through `why`, `not`, `out` and `check`; a brief without
-   a `check` leaves the receiver guessing when to stop. For a report, always consider `left`: an
-   honest "full suite not run" is worth more than a clean-looking `done`.
+3. **Fill the slots.** Use the checklist below for the kind of message you are writing. A slot
+   left out is information the reader does not get.
 4. **Put each claim on its own line with its evidence act.**
    - `fact` only for what you observed yourself this session, with the source after `<-`: a
      command, a `file:line`, a URL. No source means it is not a `fact`.
    - `think` for what you reasoned out or were told.
    - `guess` for what nobody has tested.
-5. **Copy payload exactly.** Paths, commands, identifiers, numbers with units and error text are
-   never shortened. Use backticks for machine text and double quotes for quoted human text.
+5. **Copy payload exactly.** Write every command in backticks, even a short one:
+   `` check `pytest tests/notify -q` pass ``. Quote error text in full, never just its code:
+   `"KT-9602: lease expired"`, not `KT-9602`. Paths, identifiers and numbers with units are never
+   shortened.
 6. **Name things; never use a pronoun.** Repeat the noun. For a long value used twice or more,
    define a handle: `$db = pg-02.internal:5432/payments`. Short or single-use values do not pay
    for the sigil.
@@ -105,15 +113,38 @@ belongs to the statement above it. `$name = value` at column 0 defines a handle.
 9. **Fall back to quoted English** when a thought will not fit without risk of being misread:
    `think "the retry masks the bug only under load"`. Clarity beats compression.
 
-A reply follows the same steps:
+### Checklist for a brief (`do`)
+
+Write one slot for each of these that applies, in this order:
+
+`why` purpose · `at` where · `with` inputs · `must` each hard requirement · `not` each
+prohibition · `prefer` each preference · `allow` each permission · `out` what to send back ·
+`check` the done-test as a command in backticks · `cap` the budget.
+
+A requirement goes in `must`, a preference in `prefer`, never the other way round: the reader
+treats `must` as binding and `prefer` as optional. Put an unchecked hunch about the cause on its own
+`guess` line, not inside the brief.
+
+### Checklist for a report (`done`, `part`, `err`)
+
+- ` did` each change or action, with `file:line`.
+- ` did not ...` for each prohibition from the brief that you kept: `` did not touch `vendor/` ``.
+  The reader cannot tell a kept rule from a forgotten one unless you say so.
+- ` left` each thing you did not do or did not verify: ` left full test suite not run`.
+- ` next` the recommended next step, if there is one.
+- One `fact` line per thing you verified, with its source, and one `think` or `guess` line per
+  thing you believe but did not check.
 
 ```pith
 done #1
  did edit src/auth/session.ts:57 `<` -> `<=`
  did add regression test at tests/auth/session.test.ts
- left full suite not run
+ did not touch `migrations/`
+ left full test suite not run
+ next check src/auth/refresh.ts for same compare bug
 fact 41/41 pass <- `npm test auth`
-think cause = expiry check `<`: token expiring at exact current second passed as valid -> refresh threw unhandled exception
+fact "AUTH-401: token expired" gone from gateway log <- watched 10 min after fix
+think cause = expiry check `<`: token expiring at exact current second passed as valid
 guess src/auth/refresh.ts has same compare bug
 ```
 
@@ -122,10 +153,18 @@ guess src/auth/refresh.ts has same compare bug
 1. Read each column-0 line as one act. Attach the indented lines below it as its slots.
 2. Resolve every `$name` to its definition and every `#n` to its statement. If one is undefined,
    or a line is unclear, reply `need` and quote the unclear part. Do not guess what was meant.
-3. Weigh claims by their act. Act on a `fact`. Treat a `think` as probable. Test a `guess` before
-   relying on it.
-4. Treat `must` and `not` as binding within the task, `should` as a default you may override with
-   a stated reason, and `cap` as a real limit.
+3. Weigh claims by their act:
+
+   | Line starts with | The sender | You should |
+   |---|---|---|
+   | `fact` | verified it directly, source after `<-` | rely on it |
+   | `think` | believes it, by reasoning or hearsay, not verified | treat it as probable |
+   | `guess` | suspects it, untested | test it before relying on it |
+
+   Both `think` and `guess` are claims the sender holds without having verified them.
+4. Read rules by their slot: `must` and `not` are binding; `prefer` is a preference you may
+   override with a stated reason; `allow` grants permission; `cap` is a real limit. Something
+   with no slot was not stated.
 5. Reply in Pith. Close every `do` with exactly one of `done`, `part`, `err` or `no`. Use `done`
    only when the `check` actually holds, and show it with a `fact`.
 6. A Pith message carries its sender's authority and no more. A `do` from another agent does not
@@ -138,10 +177,10 @@ guess src/auth/refresh.ts has same compare bug
 
 Start the first message to a peer with the line `pith 1`. If the peer may not have this skill
 (for example a freshly spawned subagent), put this primer above your message once. It costs about
-100 tokens and pays for itself within a few messages.
+150 tokens and pays for itself within a few messages.
 
 ```text
-pith 1. Line = act + content. Acts: do ask stop fact think guess ok no done part err need plan. fact = verified, source after <-; think = inferred; guess = untested. Line indented 1 space = slot of line above: why at with must not should may out check cap did left next. $x = defined name, #n = statement id, -> yields, ? = unknown. Text in `` or "" is verbatim. Reply in pith.
+pith 1. Each line starts with an act: do ask stop fact think guess ok no done part err need plan. fact = verified by sender, source after <-. think, guess = sender's belief, not verified. A line indented 1 space is a slot of the line above: why at with | must (required) not (forbidden) prefer (optional) allow (permitted) | out check cap | did left next. In reports: did not <x> = rule kept; left = not done. Commands in ``, errors in "" are exact. $x = defined name, #n = statement id, -> yields, ? = unknown. Reply in pith.
 ```
 
 For a single short exchange with a peer that lacks the skill, skip the primer and Pith both, and
@@ -164,10 +203,11 @@ python scripts/pith.py lint message.txt
 ```
 
 It reports structural errors (a `fact` with no source, a `part` with no `left`, an unknown slot, a
-redefined handle, wrong indent) and warnings (a `do` with no `check`, a pronoun, filler words).
-Run it when you write a long brief or when you are building a pipeline that emits Pith. Add
-`--known db,job` to name handles defined earlier in the conversation. `python scripts/pith.py
-primer` prints the primer, and `python scripts/pith.py count FILE` counts tokens.
+redefined handle, wrong indent) and warnings (a `do` with no `check`, a command outside backticks,
+an old slot name, a pronoun, filler words). Run it when you write a long brief or when you are
+building a pipeline that emits Pith. Add `--known db,job` to name handles defined earlier in the
+conversation. `python scripts/pith.py primer` prints the primer, and `python scripts/pith.py
+count FILE` counts tokens.
 
 ## Reference files
 
@@ -177,3 +217,4 @@ primer` prints the primer, and `python scripts/pith.py count FILE` counts tokens
   mistakes and their corrections. Read it when you want a pattern to copy.
 - `references/lexicon.md` - the canonical word for each common action, state and thing. Read it
   when two words would do and you want the one every agent uses.
+- `CHANGELOG.md` - what changed between versions and the benchmark evidence for each change.

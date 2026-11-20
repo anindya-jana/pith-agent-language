@@ -24,7 +24,7 @@ These have fixed roles at the start of a line. Inside content they are ordinary 
 
 Acts: `do` `ask` `stop` `fact` `think` `guess` `ok` `no` `done` `part` `err` `need` `plan`
 
-Slots: `why` `at` `with` `must` `not` `should` `may` `out` `check` `cap` `did` `left` `next` `tab`
+Slots: `why` `at` `with` `must` `not` `prefer` `allow` `out` `check` `cap` `did` `left` `next` `tab`
 
 ## 2. Actions
 

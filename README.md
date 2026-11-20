@@ -43,7 +43,11 @@ The skill that teaches agents the language is in [pith/SKILL.md](pith/SKILL.md).
 | [pith/references/examples.md](pith/references/examples.md) | Eight worked exchanges with the prose they replace, and common mistakes. |
 | [pith/scripts/pith.py](pith/scripts/pith.py) | Linter, token counter and first-contact primer. Standard library only. |
 | [pith/evals/](pith/evals/) | Three test cases for the skill: write a brief, read a report, answer a question. |
-| [bench/](bench/) | The benchmark corpus and the script that produced the token counts. |
+| [pith/CHANGELOG.md](pith/CHANGELOG.md) | What changed in each version, and the benchmark evidence behind it. |
+| [bench/MODEL_RESULTS.md](bench/MODEL_RESULTS.md) | Handoff benchmark scores, model by model. |
+| [bench/HOW_TO_TEST.md](bench/HOW_TO_TEST.md) | How to run the handoff benchmark on your own model. |
+| [bench/harness/](bench/harness/) | The handoff benchmark: case generator, runner, grader, reports. |
+| [bench/results.md](bench/results.md) | Token counts for Pith against English, terse English and JSON. |
 | [dist/pith.skill](dist/pith.skill) | The skill packaged for installing in the Claude app. |
 
 ## Install the skill
@@ -60,7 +64,7 @@ Then copy the `pith` folder to one of these places:
 - `<project>/.claude/skills/pith` to make it available in one project.
 
 Agents load it when they write a message for another agent, or when they receive one that starts
-with `pith 1`. A peer that does not have the skill can be taught with the 103-token primer:
+with `pith 1`. A peer that does not have the skill can be taught with the 144-token primer:
 
 ```bash
 python pith/scripts/pith.py primer
@@ -124,11 +128,38 @@ non-Latin letters and symbols cost the same or more than English words, and a mo
 training language most reliably. Pith's compression comes from structure (acts, slots, handles,
 no filler), not from an alphabet.
 
+## Benchmark results
+
+The handoff benchmark tests whether a message is understood, not just how short it is. One agent
+writes a message from private notes, and a fresh agent answers 11 questions about it, graded by
+code. Full tables: [bench/MODEL_RESULTS.md](bench/MODEL_RESULTS.md). To test your own model, see
+[bench/HOW_TO_TEST.md](bench/HOW_TO_TEST.md).
+
+Results for Pith 1.0 on local models (60 cases each, 4-bit, RTX 3070):
+
+| Model | English | Terse English | Pith 1.0 | Pith message tokens vs English |
+|---|---:|---:|---:|---:|
+| Qwen3.5-9B | 96.7% | 95.8% | 90.0% | -58% |
+| Qwen3.5-4B | 90.5% | 94.2% | 88.2% | -52% |
+| Gemma 4 E2B | 83.8% | 85.9% | 82.0% | -39% |
+| Gemma 3 1B | too weak to take the test (48.6% even with the full notes) | | | |
+
+What this shows:
+
+- **Pith halves message size**, but Pith 1.0 cost 2 to 7 points of accuracy against English, and
+  terse English did as well or better at a similar size.
+- **Where Pith 1.0 helped:** readers knew which claims were only guesses far more often (37% wrong
+  with English, 1% with Pith), and exact budgets, file lines and test counts survived better.
+- **Where it hurt:** kept rules went unreported, `may` was read as "maybe", `should` as a
+  requirement, and error text was shortened to its code.
+
+Pith 1.1 fixes each of those failures ([pith/CHANGELOG.md](pith/CHANGELOG.md)) and is being
+re-tested on new cases it was not tuned on.
+
 ## Limits
 
-- The benchmark measures size, not understanding. The accuracy gains come from structure that
-  forces evidence levels, done-checks and named references; they have not yet been measured with
-  a decoding test. The test cases in `pith/evals/` are the starting point for that.
+- Accuracy is measured on one task family (software-engineering briefs and reports) with
+  generated cases. Real handoffs are messier.
 - Against prose that is already telegraphic, Pith is only about 5% smaller. Its value there is
   the structure, not the size.
 - The tokenizers used are OpenAI's. Relative savings should be similar for Claude; absolute

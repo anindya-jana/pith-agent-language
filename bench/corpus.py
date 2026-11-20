@@ -28,7 +28,7 @@ SCENARIOS = [
             " at api\n"
             " not change auth public API\n"
             " not touch migrations/\n"
-            " should minimal fix, not refactor\n"
+            " prefer minimal fix, not refactor\n"
             " out diff, 1-line root cause\n"
             " check `npm test auth` pass\n"
             " cap ~20 tool calls\n"
